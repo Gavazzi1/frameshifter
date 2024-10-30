@@ -60,11 +60,33 @@ class H2Client:
 			magic.show()
 		self.sock.send(magic)
 
+		own_set = h2.H2Frame()/h2.H2SettingsFrame()
+		max_frm_sz = (1 << 24) - 1
+		max_hdr_tbl_sz = (1 << 16) - 1
+		win_sz = (1 << 31) - 1
+		own_set.settings = [
+			h2.H2Setting(id = h2.H2Setting.SETTINGS_ENABLE_PUSH, value=0),
+			h2.H2Setting(id = h2.H2Setting.SETTINGS_INITIAL_WINDOW_SIZE, value=win_sz),
+			h2.H2Setting(id = h2.H2Setting.SETTINGS_HEADER_TABLE_SIZE, value=max_hdr_tbl_sz),
+			h2.H2Setting(id = h2.H2Setting.SETTINGS_MAX_FRAME_SIZE, value=max_frm_sz),
+		]
+
+		h2seq = h2.H2Seq()
+		h2seq.frames = [
+			own_set,
+		]
+		for frame in h2seq.frames:
+			if self.verbose:
+				print("-"*32 + "SENDING" + "-"*32)
+				frame.show()
+			self.sock.send(frame)
+
 		# RECEIVING
 		srv_set = self.sock.recv()
 		if self.verbose:
 			print("-"*32+"RECEIVING"+"-"*32)
 			srv_set.show()
+
 		srv_max_frm_sz = 1<<14
 		srv_hdr_tbl_sz = 4096
 		srv_max_hdr_tbl_sz = 0
@@ -79,29 +101,6 @@ class H2Client:
 		
 		srv_max_hdr_lst_sz = 1<<10
 
-		own_set = h2.H2Frame()/h2.H2SettingsFrame()
-		max_frm_sz = (1 << 24) - 1
-		max_hdr_tbl_sz = (1 << 16) - 1
-		win_sz = (1 << 31) - 1
-		own_set.settings = [
-			h2.H2Setting(id = h2.H2Setting.SETTINGS_ENABLE_PUSH, value=0),
-			h2.H2Setting(id = h2.H2Setting.SETTINGS_INITIAL_WINDOW_SIZE, value=win_sz),
-			h2.H2Setting(id = h2.H2Setting.SETTINGS_HEADER_TABLE_SIZE, value=max_hdr_tbl_sz),
-			h2.H2Setting(id = h2.H2Setting.SETTINGS_MAX_FRAME_SIZE, value=max_frm_sz),
-		]
-
-		winupdate = h2.H2Frame(b'\x00\x00\x04\x08\x00\x00\x00\x00\x00\x3f\xff\x00\x01')
-		set_ack = h2.H2Frame(flags={'A'})/h2.H2SettingsFrame()
-
-		h2seq = h2.H2Seq()
-		h2seq.frames = [
-			own_set,
-		]
-		for frame in h2seq.frames:
-			if self.verbose:
-				print("-"*32 + "SENDING" + "-"*32)
-				frame.show()
-			self.sock.send(frame)
 
 		# while loop for waiting until ack is received for client's settings
 		new_frame = None
@@ -109,15 +108,10 @@ class H2Client:
 				new_frame.type == h2.H2SettingsFrame.type_id 
 				and 'A' in new_frame.flags
 			):
-			try:
-				new_frame = self.sock.recv()
-				if self.verbose:
-					print("-"*32 + "RECEIVING" + "-"*32)
-					new_frame.show()
-			except:
-				import time
-				time.sleep(1)
-				new_frame = None
+			new_frame = self.sock.recv()
+			if self.verbose:
+				print("-"*32 + "RECEIVING" + "-"*32)
+				new_frame.show()
 
 
 	def send_sequence(self, frames=None):

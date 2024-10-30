@@ -37,32 +37,32 @@ class Fuzzer:
         #self.entry_hosts = {self.entry_urls[i]:self.entry_host_headers[i] for i in range(len(self.entry_urls))}
         self.hosts = {self.urls[i]:self.host_headers[i] for i in range(len(self.urls))}
 
-    def h2_send_fuzzy_data(self, inputdata, list_responses):
+    def h2_send_fuzzy_data(self, inputdata, list_responses, idx):
         try:
             sequence = inputdata.tree_to_sequence()
             h2_client = H2Client(self.verbose)
-            if inputdata.string_mutated:
-                response = h2_client.send(inputdata.host, int(inputdata.port), inputdata.host_header, inputdata.seed, sequence)  
-            else:
-                response = b'input not sent, because not string mutated'
+            response = h2_client.send(inputdata.host, int(inputdata.port), inputdata.host_header, inputdata.seed, sequence)  
 
             with self.lock:
-                list_responses.append(response)
+                list_responses[idx] = response
 
         except Exception as e:
+            pass
             #raise(e)
-            _print_exception([inputdata.host_header, inputdata.seed])
+            #_print_exception([inputdata.host_header, inputdata.seed])
 
     def get_responses(self, seed, request):
         threads = []
-        list_responses = []
-        for url in self.urls:
+        list_responses = [None for url in self.urls]
+        for i in range(len(self.urls));
+            url = self.urls[i]
             request.seed = seed
             request.url = url
             request.host_header = self.hosts[url]
 
             request_copy = copy.deepcopy(request)
-            thread = threading.Thread(target=self.h2_send_fuzzy_data, args=(request_copy, list_responses))
+            thread = threading.Thread(target=self.h2_send_fuzzy_data,
+                                      args=(request_copy, list_responses, i))
             threads.append(thread)
             thread.start()
 
@@ -72,8 +72,10 @@ class Fuzzer:
         return list_responses
 
     def blackbox_fuzz_parallel_batch(self):
-        for j in range(0, 1):
-            num_procs = 128
+        j = -1
+        while True:
+            j += 1
+            num_procs = 64
             batch_size = 1000
             seeds_splitted = [[j*batch_size + i for i in list(range(i, batch_size, num_procs))] for i in range(num_procs)]
             quot = Queue()
